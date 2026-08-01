@@ -1,4 +1,5 @@
 import kotlin.math.log10
+import kotlin.math.pow
 
 object ConversorPotencia {
 
@@ -21,5 +22,32 @@ object ConversorPotencia {
             potencia * unidade.fatorParaMilliwatts
 
         return 10 * log10(potenciaEmMilliwatts)
+    }
+
+    fun converterParaLogaritmica(
+        potencia: Double,
+        unidadeLinear: UnidadePotencia,
+        unidadeLogaritmica: UnidadePotenciaLogaritmica
+    ): Double {
+        val potenciaEmDbm = converterParaDbm(potencia, unidadeLinear)
+
+        return when (unidadeLogaritmica) {
+            UnidadePotenciaLogaritmica.DBM -> potenciaEmDbm
+            UnidadePotenciaLogaritmica.DBW -> potenciaEmDbm - 30.0
+        }
+    }
+
+    fun converterParaLinear(
+        potencia: Double,
+        unidadeLogaritmica: UnidadePotenciaLogaritmica,
+        unidadeLinear: UnidadePotencia
+    ): Double {
+        val potenciaEmDbm = when (unidadeLogaritmica) {
+            UnidadePotenciaLogaritmica.DBM -> potencia
+            UnidadePotenciaLogaritmica.DBW -> potencia + 30.0
+        }
+        val potenciaEmMilliwatts = 10.0.pow(potenciaEmDbm / 10.0)
+
+        return potenciaEmMilliwatts / unidadeLinear.fatorParaMilliwatts
     }
 }

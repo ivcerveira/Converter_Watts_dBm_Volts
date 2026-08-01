@@ -2,44 +2,56 @@ import java.awt.*
 import java.awt.event.KeyEvent
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import java.math.BigDecimal
 import javax.swing.*
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 
 class ConversorPotenciaGUI : JFrame() {
 
-    private val caixaUnidade = JComboBox(
+    private val caixaUnidadePotenciaLinear = JComboBox(
         UnidadePotencia.entries.toTypedArray()
     )
+    private val campoPotenciaLinear = JTextField(15)
 
-    private val campoPotencia = JTextField(15)
+    private val caixaUnidadePotenciaLogaritmica = JComboBox(
+        UnidadePotenciaLogaritmica.entries.toTypedArray()
+    )
+    private val campoPotenciaLogaritmica = JTextField(15)
 
-    private val rotuloUnidadeSelecionada = JLabel(
+    private val rotuloUnidadeLinear = JLabel(
         UnidadePotencia.MILLIWATT.simbolo
     )
-
-    private val rotuloResultado = JLabel(
-        "Digite uma potência e clique em Converter",
-        SwingConstants.CENTER
+    private val rotuloUnidadeLogaritmica = JLabel(
+        UnidadePotenciaLogaritmica.DBM.simbolo
     )
 
     private val botaoConverter = JButton("Converter")
     private val botaoLimpar = JButton("Limpar")
 
+    private var campoDeOrigem = CampoDeOrigem.LINEAR
+    private var atualizandoCampos = false
+
+    private enum class CampoDeOrigem {
+        LINEAR,
+        LOGARITMICO
+    }
+
     init {
-        //title = "Conversor de Potência para dBm"
         title = "Conversor (Watts-dBm-Volts)"
         defaultCloseOperation = EXIT_ON_CLOSE
 
         criarInterface()
         configurarEventos()
 
-        minimumSize = Dimension(480, 380)
-        setSize(520, 430)
+        minimumSize = Dimension(480, 330)
+        setSize(520, 380)
         setLocationRelativeTo(null)
 
         addWindowListener(
             object : WindowAdapter() {
                 override fun windowOpened(evento: WindowEvent) {
-                    campoPotencia.requestFocusInWindow()
+                    campoPotenciaLinear.requestFocusInWindow()
                 }
             }
         )
@@ -49,16 +61,274 @@ class ConversorPotenciaGUI : JFrame() {
         layout = BorderLayout(10, 10)
 
         val fonteCampos = Font("SansSerif", Font.PLAIN, 13)
-        val fonteRotulosEntrada = Font("SansSerif", Font.PLAIN, 13)
+        val fonteRotulos = Font("SansSerif", Font.PLAIN, 13)
 
-        caixaUnidade.selectedItem = UnidadePotencia.MILLIWATT
-        caixaUnidade.font = fonteCampos
-        caixaUnidade.isFocusable = false
-        caixaUnidade.preferredSize = Dimension(
-            caixaUnidade.preferredSize.width,
-            32
+        caixaUnidadePotenciaLinear.selectedItem =
+            UnidadePotencia.MILLIWATT
+        configurarCaixa(caixaUnidadePotenciaLinear, fonteCampos)
+        configurarCaixa(
+            caixaUnidadePotenciaLogaritmica,
+            fonteCampos
         )
-        caixaUnidade.renderer = object : DefaultListCellRenderer() {
+        configurarCampo(campoPotenciaLinear, fonteCampos)
+        configurarCampo(campoPotenciaLogaritmica, fonteCampos)
+        rotuloUnidadeLinear.font = fonteRotulos
+        rotuloUnidadeLogaritmica.font = fonteRotulos
+
+        val rotuloPotenciaLinear = JLabel("Potência Linear").apply {
+            font = fonteRotulos
+        }
+        val rotuloPotenciaLogaritmica =
+            JLabel("Potência Logarítmica").apply {
+                font = fonteRotulos
+            }
+        val larguraRotulo = maxOf(
+            rotuloPotenciaLinear.preferredSize.width,
+            rotuloPotenciaLogaritmica.preferredSize.width
+        )
+        val larguraUnidade = maxOf(
+            rotuloUnidadeLinear.preferredSize.width,
+            rotuloUnidadeLogaritmica.preferredSize.width
+        )
+
+        val painelFormulario = JPanel(GridBagLayout())
+        val restricoes = GridBagConstraints().apply {
+            insets = Insets(6, 8, 2, 8)
+            fill = GridBagConstraints.HORIZONTAL
+            gridx = 0
+            weightx = 1.0
+        }
+
+        adicionarCaixa(
+            painelFormulario,
+            caixaUnidadePotenciaLinear,
+            larguraRotulo,
+            larguraUnidade,
+            restricoes,
+            0
+        )
+        adicionarCampo(
+            painelFormulario,
+            rotuloPotenciaLinear,
+            campoPotenciaLinear,
+            rotuloUnidadeLinear,
+            restricoes,
+            1
+        )
+        adicionarCaixa(
+            painelFormulario,
+            caixaUnidadePotenciaLogaritmica,
+            larguraRotulo,
+            larguraUnidade,
+            restricoes,
+            2
+        )
+        adicionarCampo(
+            painelFormulario,
+            rotuloPotenciaLogaritmica,
+            campoPotenciaLogaritmica,
+            rotuloUnidadeLogaritmica,
+            restricoes,
+            3
+        )
+
+        val painelBotoes = JPanel(
+            FlowLayout(FlowLayout.CENTER, 10, 15)
+        ).apply {
+            botaoConverter.isFocusable = false
+            add(botaoConverter)
+            add(botaoLimpar)
+        }
+
+        val painelCentral = JPanel(BorderLayout(10, 10)).apply {
+            border = BorderFactory.createEmptyBorder(15, 40, 25, 40)
+            add(painelFormulario, BorderLayout.NORTH)
+            add(painelBotoes, BorderLayout.CENTER)
+        }
+
+        add(painelCentral, BorderLayout.CENTER)
+    }
+
+    private fun adicionarCaixa(
+        painel: JPanel,
+        caixa: JComboBox<*>,
+        larguraRotulo: Int,
+        larguraUnidade: Int,
+        restricoes: GridBagConstraints,
+        linha: Int
+    ) {
+        restricoes.gridy = linha
+        restricoes.insets = Insets(6, 8, 2, 8)
+        painel.add(
+            JPanel(BorderLayout(8, 0)).apply {
+                add(
+                    Box.createRigidArea(Dimension(larguraRotulo, 0)),
+                    BorderLayout.WEST
+                )
+                add(caixa, BorderLayout.CENTER)
+                add(
+                    Box.createRigidArea(Dimension(larguraUnidade, 0)),
+                    BorderLayout.EAST
+                )
+            },
+            restricoes
+        )
+    }
+
+    private fun adicionarCampo(
+        painel: JPanel,
+        rotulo: JLabel,
+        campo: JTextField,
+        rotuloUnidade: JLabel,
+        restricoes: GridBagConstraints,
+        linha: Int
+    ) {
+        restricoes.gridy = linha
+        restricoes.insets = Insets(2, 8, 6, 8)
+        painel.add(
+            JPanel(BorderLayout(8, 0)).apply {
+                add(rotulo, BorderLayout.WEST)
+                add(campo, BorderLayout.CENTER)
+                add(rotuloUnidade, BorderLayout.EAST)
+            },
+            restricoes
+        )
+    }
+
+    private fun configurarEventos() {
+        botaoConverter.addActionListener { realizarConversao() }
+        botaoLimpar.addActionListener { limparCampos() }
+
+        caixaUnidadePotenciaLinear.addActionListener {
+            val unidade = caixaUnidadePotenciaLinear.selectedItem
+                    as? UnidadePotencia
+            rotuloUnidadeLinear.text = unidade?.simbolo.orEmpty()
+        }
+        caixaUnidadePotenciaLogaritmica.addActionListener {
+            val unidade = caixaUnidadePotenciaLogaritmica.selectedItem
+                    as? UnidadePotenciaLogaritmica
+            rotuloUnidadeLogaritmica.text = unidade?.simbolo.orEmpty()
+        }
+
+        campoPotenciaLinear.addActionListener { realizarConversao() }
+        campoPotenciaLogaritmica.addActionListener {
+            realizarConversao()
+        }
+        campoPotenciaLinear.document.addDocumentListener(
+            criarOuvinteDeEdicao(CampoDeOrigem.LINEAR)
+        )
+        campoPotenciaLogaritmica.document.addDocumentListener(
+            criarOuvinteDeEdicao(CampoDeOrigem.LOGARITMICO)
+        )
+
+        rootPane.defaultButton = botaoConverter
+        botaoConverter.mnemonic = KeyEvent.VK_C
+        botaoLimpar.mnemonic = KeyEvent.VK_L
+    }
+
+    private fun realizarConversao() {
+        try {
+            if (campoDeOrigem == CampoDeOrigem.LINEAR) {
+                converterDeLinearParaLogaritmica()
+            } else {
+                converterDeLogaritmicaParaLinear()
+            }
+        } catch (erro: IllegalArgumentException) {
+            mostrarMensagemDeErro(
+                erro.message ?: "Não foi possível realizar a conversão."
+            )
+        }
+    }
+
+    private fun converterDeLinearParaLogaritmica() {
+        val potencia = lerPotencia(campoPotenciaLinear)
+        val unidadeLinear =
+            caixaUnidadePotenciaLinear.selectedItem as UnidadePotencia
+        val unidadeLogaritmica =
+            caixaUnidadePotenciaLogaritmica.selectedItem
+                    as UnidadePotenciaLogaritmica
+        val resultado = ConversorPotencia.converterParaLogaritmica(
+            potencia,
+            unidadeLinear,
+            unidadeLogaritmica
+        )
+
+        definirTextoSemAlterarOrigem(
+            campoPotenciaLogaritmica,
+            formatarResultado(resultado)
+        )
+        campoPotenciaLinear.requestFocusInWindow()
+        campoPotenciaLinear.selectAll()
+    }
+
+    private fun converterDeLogaritmicaParaLinear() {
+        val potencia = lerPotencia(campoPotenciaLogaritmica)
+        val unidadeLogaritmica =
+            caixaUnidadePotenciaLogaritmica.selectedItem
+                    as UnidadePotenciaLogaritmica
+        val unidadeLinear =
+            caixaUnidadePotenciaLinear.selectedItem as UnidadePotencia
+        val resultado = ConversorPotencia.converterParaLinear(
+            potencia,
+            unidadeLogaritmica,
+            unidadeLinear
+        )
+
+        definirTextoSemAlterarOrigem(
+            campoPotenciaLinear,
+            formatarResultado(resultado)
+        )
+        campoPotenciaLogaritmica.requestFocusInWindow()
+        campoPotenciaLogaritmica.selectAll()
+    }
+
+    private fun lerPotencia(campo: JTextField): Double {
+        val texto = campo.text.trim()
+        if (texto.isEmpty()) {
+            throw IllegalArgumentException("Digite o valor da potência.")
+        }
+
+        return texto.replace(",", ".").toDoubleOrNull()
+            ?: throw IllegalArgumentException(
+                "Digite um valor numérico válido."
+            )
+    }
+
+    private fun formatarResultado(resultado: Double): String {
+        return BigDecimal.valueOf(resultado)
+            .stripTrailingZeros()
+            .toPlainString()
+    }
+
+    private fun limparCampos() {
+        definirTextoSemAlterarOrigem(campoPotenciaLinear, "")
+        definirTextoSemAlterarOrigem(campoPotenciaLogaritmica, "")
+        campoDeOrigem = CampoDeOrigem.LINEAR
+        campoPotenciaLinear.requestFocusInWindow()
+    }
+
+    private fun mostrarMensagemDeErro(mensagem: String) {
+        JOptionPane.showMessageDialog(
+            this,
+            mensagem,
+            "Dados inválidos",
+            JOptionPane.WARNING_MESSAGE
+        )
+
+        val campo = if (campoDeOrigem == CampoDeOrigem.LINEAR) {
+            campoPotenciaLinear
+        } else {
+            campoPotenciaLogaritmica
+        }
+        campo.requestFocusInWindow()
+        campo.selectAll()
+    }
+
+    private fun configurarCaixa(caixa: JComboBox<*>, fonte: Font) {
+        caixa.font = fonte
+        caixa.isFocusable = false
+        caixa.preferredSize = Dimension(caixa.preferredSize.width, 32)
+        caixa.renderer = object : DefaultListCellRenderer() {
             override fun getListCellRendererComponent(
                 list: JList<*>?,
                 value: Any?,
@@ -73,225 +343,54 @@ class ConversorPotenciaGUI : JFrame() {
                     isSelected,
                     cellHasFocus
                 ) as JLabel
-
-                componente.border = BorderFactory.createEmptyBorder(
-                    6,
-                    8,
-                    6,
-                    8
-                )
-
+                componente.border =
+                    BorderFactory.createEmptyBorder(6, 8, 6, 8)
                 return componente
             }
         }
+    }
 
-        campoPotencia.font = fonteCampos
-        campoPotencia.preferredSize = Dimension(
-            campoPotencia.preferredSize.width,
+    private fun configurarCampo(campo: JTextField, fonte: Font) {
+        campo.font = fonte
+        campo.preferredSize = Dimension(
+            campo.preferredSize.width,
             32
         )
-
-        rotuloUnidadeSelecionada.font = fonteRotulosEntrada
-
-        val rotuloPotenciaLinear = JLabel("Potência Linear").apply {
-            font = fonteRotulosEntrada
-        }
-
-        val larguraRotuloPotencia = rotuloPotenciaLinear.preferredSize.width
-        val larguraRotuloUnidade = rotuloUnidadeSelecionada.preferredSize.width
-
-        val painelFormulario = JPanel(GridBagLayout())
-
-        val restricoes = GridBagConstraints().apply {
-            insets = Insets(6, 8, 2, 8)
-            fill = GridBagConstraints.HORIZONTAL
-            gridx = 0
-            weightx = 1.0
-        }
-
-        // JComboBox acima do campo de texto
-        restricoes.gridy = 0
-
-        painelFormulario.add(
-            JPanel(BorderLayout(8, 0)).apply {
-                add(
-                    Box.createRigidArea(
-                        Dimension(larguraRotuloPotencia, 0)
-                    ),
-                    BorderLayout.WEST
-                )
-                add(caixaUnidade, BorderLayout.CENTER)
-                add(
-                    Box.createRigidArea(
-                        Dimension(larguraRotuloUnidade, 0)
-                    ),
-                    BorderLayout.EAST
-                )
-            },
-            restricoes
-        )
-
-        // JLabel e campo de texto
-        restricoes.gridy = 1
-        restricoes.insets = Insets(2, 8, 6, 8)
-
-        val painelPotencia = JPanel(
-            BorderLayout(8, 0)
-        ).apply {
-            add(rotuloPotenciaLinear, BorderLayout.WEST)
-            add(campoPotencia, BorderLayout.CENTER)
-            add(rotuloUnidadeSelecionada, BorderLayout.EAST)
-        }
-
-        painelFormulario.add(
-            painelPotencia,
-            restricoes
-        )
-
-        val painelBotoes = JPanel(
-            FlowLayout(
-                FlowLayout.CENTER,
-                10,
-                15
-            )
-        ).apply {
-            botaoConverter.isFocusable = false
-            add(botaoConverter)
-            add(botaoLimpar)
-        }
-
-        rotuloResultado.apply {
-            font = Font("SansSerif", Font.BOLD, 17)
-
-            border = BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Resultado"),
-                BorderFactory.createEmptyBorder(
-                    25,
-                    10,
-                    25,
-                    10
-                )
-            )
-        }
-
-        val painelCentral = JPanel(
-            BorderLayout(10, 10)
-        ).apply {
-            border = BorderFactory.createEmptyBorder(
-                15,
-                40,
-                25,
-                40
-            )
-
-            add(painelFormulario, BorderLayout.NORTH)
-            add(painelBotoes, BorderLayout.CENTER)
-            add(rotuloResultado, BorderLayout.SOUTH)
-        }
-
-        add(painelCentral, BorderLayout.CENTER)
     }
 
-    private fun configurarEventos() {
-        botaoConverter.addActionListener {
-            realizarConversao()
-        }
-
-        botaoLimpar.addActionListener {
-            limparCampos()
-        }
-
-        caixaUnidade.addActionListener {
-            atualizarRotuloUnidadeSelecionada()
-            focarCampoPotencia()
-        }
-
-        campoPotencia.addActionListener {
-            realizarConversao()
-        }
-
-        rootPane.defaultButton = botaoConverter
-
-        botaoConverter.mnemonic = KeyEvent.VK_C
-        botaoLimpar.mnemonic = KeyEvent.VK_L
-    }
-
-    private fun realizarConversao() {
-        try {
-            val textoDigitado = campoPotencia.text.trim()
-
-            if (textoDigitado.isEmpty()) {
-                throw IllegalArgumentException(
-                    "Digite o valor da potência."
-                )
+    private fun criarOuvinteDeEdicao(
+        origem: CampoDeOrigem
+    ): DocumentListener {
+        return object : DocumentListener {
+            private fun registrarOrigem() {
+                if (!atualizandoCampos) {
+                    campoDeOrigem = origem
+                }
             }
 
-            val potencia = textoDigitado
-                .replace(",", ".")
-                .toDoubleOrNull()
-                ?: throw IllegalArgumentException(
-                    "Digite um valor numérico válido."
-                )
+            override fun insertUpdate(evento: DocumentEvent) {
+                registrarOrigem()
+            }
 
-            val unidadeSelecionada =
-                caixaUnidade.selectedItem as? UnidadePotencia
-                    ?: throw IllegalArgumentException(
-                        "Selecione uma unidade."
-                    )
+            override fun removeUpdate(evento: DocumentEvent) {
+                registrarOrigem()
+            }
 
-            val resultado = ConversorPotencia.converterParaDbm(
-                potencia,
-                unidadeSelecionada
-            )
-
-            rotuloResultado.text = String.format(
-                "%.6f %s = %.2f dBm",
-                potencia,
-                unidadeSelecionada.simbolo,
-                resultado
-            )
-        } catch (erro: IllegalArgumentException) {
-            mostrarMensagemDeErro(
-                erro.message
-                    ?: "Não foi possível realizar a conversão."
-            )
+            override fun changedUpdate(evento: DocumentEvent) {
+                registrarOrigem()
+            }
         }
-
-        focarCampoPotencia()
     }
 
-    private fun limparCampos() {
-        campoPotencia.text = ""
-
-        rotuloResultado.text =
-            "Digite uma potência e clique em Converter"
-
-        campoPotencia.requestFocusInWindow()
-    }
-
-    private fun mostrarMensagemDeErro(mensagem: String) {
-        JOptionPane.showMessageDialog(
-            this,
-            mensagem,
-            "Dados inválidos",
-            JOptionPane.WARNING_MESSAGE
-        )
-
-        campoPotencia.requestFocusInWindow()
-        campoPotencia.selectAll()
-    }
-
-    private fun atualizarRotuloUnidadeSelecionada() {
-        val unidadeSelecionada =
-            caixaUnidade.selectedItem as? UnidadePotencia
-
-        rotuloUnidadeSelecionada.text =
-            unidadeSelecionada?.simbolo.orEmpty()
-    }
-
-    private fun focarCampoPotencia() {
-        SwingUtilities.invokeLater {
-            campoPotencia.requestFocusInWindow()
+    private fun definirTextoSemAlterarOrigem(
+        campo: JTextField,
+        texto: String
+    ) {
+        atualizandoCampos = true
+        try {
+            campo.text = texto
+        } finally {
+            atualizandoCampos = false
         }
     }
 }
