@@ -10,7 +10,7 @@ import javax.swing.event.DocumentListener
 class ConversorPotenciaGUI : JFrame() {
 
     private val caixaUnidadePotenciaLinear = JComboBox(
-        UnidadePotencia.entries.toTypedArray()
+        UnidadePotenciaLinear.entries.toTypedArray()
     )
     private val campoPotenciaLinear = JTextField(15)
 
@@ -20,7 +20,7 @@ class ConversorPotenciaGUI : JFrame() {
     private val campoPotenciaLogaritmica = JTextField(15)
 
     private val rotuloUnidadeLinear = JLabel(
-        UnidadePotencia.MILLIWATT.simbolo
+        UnidadePotenciaLinear.MILLIWATT.simbolo
     )
     private val rotuloUnidadeLogaritmica = JLabel(
         UnidadePotenciaLogaritmica.DBM.simbolo
@@ -64,7 +64,7 @@ class ConversorPotenciaGUI : JFrame() {
         val fonteRotulos = Font("SansSerif", Font.PLAIN, 13)
 
         caixaUnidadePotenciaLinear.selectedItem =
-            UnidadePotencia.MILLIWATT
+            UnidadePotenciaLinear.MILLIWATT
         configurarCaixa(caixaUnidadePotenciaLinear, fonteCampos)
         configurarCaixa(
             caixaUnidadePotenciaLogaritmica,
@@ -112,6 +112,7 @@ class ConversorPotenciaGUI : JFrame() {
             rotuloPotenciaLinear,
             campoPotenciaLinear,
             rotuloUnidadeLinear,
+            larguraRotulo,
             restricoes,
             1
         )
@@ -128,6 +129,7 @@ class ConversorPotenciaGUI : JFrame() {
             rotuloPotenciaLogaritmica,
             campoPotenciaLogaritmica,
             rotuloUnidadeLogaritmica,
+            larguraRotulo,
             restricoes,
             3
         )
@@ -180,6 +182,7 @@ class ConversorPotenciaGUI : JFrame() {
         rotulo: JLabel,
         campo: JTextField,
         rotuloUnidade: JLabel,
+        larguraRotulo: Int,
         restricoes: GridBagConstraints,
         linha: Int
     ) {
@@ -187,6 +190,10 @@ class ConversorPotenciaGUI : JFrame() {
         restricoes.insets = Insets(2, 8, 6, 8)
         painel.add(
             JPanel(BorderLayout(8, 0)).apply {
+                rotulo.preferredSize = Dimension(
+                    larguraRotulo,
+                    rotulo.preferredSize.height
+                )
                 add(rotulo, BorderLayout.WEST)
                 add(campo, BorderLayout.CENTER)
                 add(rotuloUnidade, BorderLayout.EAST)
@@ -201,7 +208,7 @@ class ConversorPotenciaGUI : JFrame() {
 
         caixaUnidadePotenciaLinear.addActionListener {
             val unidade = caixaUnidadePotenciaLinear.selectedItem
-                    as? UnidadePotencia
+                    as? UnidadePotenciaLinear
             rotuloUnidadeLinear.text = unidade?.simbolo.orEmpty()
         }
         caixaUnidadePotenciaLogaritmica.addActionListener {
@@ -229,9 +236,9 @@ class ConversorPotenciaGUI : JFrame() {
     private fun realizarConversao() {
         try {
             if (campoDeOrigem == CampoDeOrigem.LINEAR) {
-                converterDeLinearParaLogaritmica()
+                converterDePotenciaLinearParaPotenciaLogaritmica()
             } else {
-                converterDeLogaritmicaParaLinear()
+                converterDePotenciaLogaritmicaParaPotenciaLinear()
             }
         } catch (erro: IllegalArgumentException) {
             mostrarMensagemDeErro(
@@ -240,10 +247,10 @@ class ConversorPotenciaGUI : JFrame() {
         }
     }
 
-    private fun converterDeLinearParaLogaritmica() {
+    private fun converterDePotenciaLinearParaPotenciaLogaritmica() {
         val potencia = lerPotencia(campoPotenciaLinear)
         val unidadeLinear =
-            caixaUnidadePotenciaLinear.selectedItem as UnidadePotencia
+            caixaUnidadePotenciaLinear.selectedItem as UnidadePotenciaLinear
         val unidadeLogaritmica =
             caixaUnidadePotenciaLogaritmica.selectedItem
                     as UnidadePotenciaLogaritmica
@@ -257,17 +264,16 @@ class ConversorPotenciaGUI : JFrame() {
             campoPotenciaLogaritmica,
             formatarResultado(resultado)
         )
-        campoPotenciaLinear.requestFocusInWindow()
-        campoPotenciaLinear.selectAll()
+        posicionarCursorNoFim(campoPotenciaLinear)
     }
 
-    private fun converterDeLogaritmicaParaLinear() {
+    private fun converterDePotenciaLogaritmicaParaPotenciaLinear() {
         val potencia = lerPotencia(campoPotenciaLogaritmica)
         val unidadeLogaritmica =
             caixaUnidadePotenciaLogaritmica.selectedItem
                     as UnidadePotenciaLogaritmica
         val unidadeLinear =
-            caixaUnidadePotenciaLinear.selectedItem as UnidadePotencia
+            caixaUnidadePotenciaLinear.selectedItem as UnidadePotenciaLinear
         val resultado = ConversorPotencia.converterParaLinear(
             potencia,
             unidadeLogaritmica,
@@ -278,8 +284,7 @@ class ConversorPotenciaGUI : JFrame() {
             campoPotenciaLinear,
             formatarResultado(resultado)
         )
-        campoPotenciaLogaritmica.requestFocusInWindow()
-        campoPotenciaLogaritmica.selectAll()
+        posicionarCursorNoFim(campoPotenciaLogaritmica)
     }
 
     private fun lerPotencia(campo: JTextField): Double {
@@ -343,6 +348,7 @@ class ConversorPotenciaGUI : JFrame() {
                     isSelected,
                     cellHasFocus
                 ) as JLabel
+                componente.horizontalAlignment = LEFT
                 componente.border =
                     BorderFactory.createEmptyBorder(6, 8, 6, 8)
                 return componente
@@ -352,10 +358,16 @@ class ConversorPotenciaGUI : JFrame() {
 
     private fun configurarCampo(campo: JTextField, fonte: Font) {
         campo.font = fonte
+        campo.horizontalAlignment = JTextField.LEFT
         campo.preferredSize = Dimension(
             campo.preferredSize.width,
             32
         )
+    }
+
+    private fun posicionarCursorNoFim(campo: JTextField) {
+        campo.requestFocusInWindow()
+        campo.caretPosition = campo.document.length
     }
 
     private fun criarOuvinteDeEdicao(

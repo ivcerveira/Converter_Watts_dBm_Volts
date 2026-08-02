@@ -12,7 +12,7 @@ object ConversorPotencia {
      */
     fun converterParaDbm(
         potencia: Double,
-        unidade: UnidadePotencia
+        unidade: UnidadePotenciaLinear
     ): Double {
         require(potencia > 0) {
             "A potência deve ser maior que zero."
@@ -26,7 +26,7 @@ object ConversorPotencia {
 
     fun converterParaLogaritmica(
         potencia: Double,
-        unidadeLinear: UnidadePotencia,
+        unidadeLinear: UnidadePotenciaLinear,
         unidadeLogaritmica: UnidadePotenciaLogaritmica
     ): Double {
         val potenciaEmDbm = converterParaDbm(potencia, unidadeLinear)
@@ -40,7 +40,7 @@ object ConversorPotencia {
     fun converterParaLinear(
         potencia: Double,
         unidadeLogaritmica: UnidadePotenciaLogaritmica,
-        unidadeLinear: UnidadePotencia
+        unidadeLinear: UnidadePotenciaLinear
     ): Double {
         val potenciaEmDbm = when (unidadeLogaritmica) {
             UnidadePotenciaLogaritmica.DBM -> potencia

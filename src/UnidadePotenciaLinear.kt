@@ -1,4 +1,4 @@
-enum class UnidadePotencia(
+enum class UnidadePotenciaLinear(
     private val descricao: String,
     val simbolo: String,
     val fatorParaMilliwatts: Double
