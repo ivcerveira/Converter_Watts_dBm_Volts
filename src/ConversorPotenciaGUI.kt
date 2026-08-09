@@ -9,6 +9,11 @@ import javax.swing.event.DocumentListener
 
 class ConversorPotenciaGUI : JFrame() {
 
+    private companion object {
+        const val REDUCAO_LARGURA_CAIXA = 170
+        const val REDUCAO_LARGURA_CAMPO = 30
+    }
+
     private val caixaUnidadePotenciaLinear = JComboBox(
         UnidadePotenciaLinear.entries.toTypedArray()
     )
@@ -44,8 +49,9 @@ class ConversorPotenciaGUI : JFrame() {
         criarInterface()
         configurarEventos()
 
-        minimumSize = Dimension(480, 330)
-        setSize(520, 380)
+        minimumSize = Dimension(580, 330)
+        setSize(620, 380)
+        isResizable = false
         setLocationRelativeTo(null)
 
         addWindowListener(
@@ -77,10 +83,12 @@ class ConversorPotenciaGUI : JFrame() {
 
         val rotuloPotenciaLinear = JLabel("Potência Linear").apply {
             font = fonteRotulos
+            horizontalAlignment = SwingConstants.RIGHT
         }
         val rotuloPotenciaLogaritmica =
             JLabel("Potência Logarítmica").apply {
                 font = fonteRotulos
+                horizontalAlignment = SwingConstants.RIGHT
             }
         val larguraRotulo = maxOf(
             rotuloPotenciaLinear.preferredSize.width,
@@ -89,6 +97,14 @@ class ConversorPotenciaGUI : JFrame() {
         val larguraUnidade = maxOf(
             rotuloUnidadeLinear.preferredSize.width,
             rotuloUnidadeLogaritmica.preferredSize.width
+        )
+        rotuloUnidadeLinear.preferredSize = Dimension(
+            larguraUnidade + REDUCAO_LARGURA_CAMPO,
+            rotuloUnidadeLinear.preferredSize.height
+        )
+        rotuloUnidadeLogaritmica.preferredSize = Dimension(
+            larguraUnidade + REDUCAO_LARGURA_CAMPO,
+            rotuloUnidadeLogaritmica.preferredSize.height
         )
 
         val painelFormulario = JPanel(GridBagLayout())
@@ -143,7 +159,7 @@ class ConversorPotenciaGUI : JFrame() {
         }
 
         val painelCentral = JPanel(BorderLayout(10, 10)).apply {
-            border = BorderFactory.createEmptyBorder(15, 40, 25, 40)
+            border = BorderFactory.createEmptyBorder(15, 10, 25, 40)
             add(painelFormulario, BorderLayout.NORTH)
             add(painelBotoes, BorderLayout.CENTER)
         }
@@ -169,7 +185,12 @@ class ConversorPotenciaGUI : JFrame() {
                 )
                 add(caixa, BorderLayout.CENTER)
                 add(
-                    Box.createRigidArea(Dimension(larguraUnidade, 0)),
+                    Box.createRigidArea(
+                        Dimension(
+                            larguraUnidade + REDUCAO_LARGURA_CAIXA,
+                            0
+                        )
+                    ),
                     BorderLayout.EAST
                 )
             },
@@ -359,6 +380,10 @@ class ConversorPotenciaGUI : JFrame() {
     private fun configurarCampo(campo: JTextField, fonte: Font) {
         campo.font = fonte
         campo.horizontalAlignment = JTextField.LEFT
+        campo.border = BorderFactory.createCompoundBorder(
+            campo.border,
+            BorderFactory.createEmptyBorder(0, 4, 0, 0)
+        )
         campo.preferredSize = Dimension(
             campo.preferredSize.width,
             32
