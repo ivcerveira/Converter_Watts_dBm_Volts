@@ -1,28 +1,41 @@
 import java.awt.*
-import java.awt.event.KeyEvent
+import java.awt.event.FocusAdapter
+import java.awt.event.FocusEvent
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.math.BigDecimal
+import java.math.RoundingMode
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
+import javax.swing.text.AbstractDocument
+import javax.swing.text.AttributeSet
+import javax.swing.text.DocumentFilter
 
 class ConversorPotenciaGUI : JFrame() {
 
     private companion object {
         const val REDUCAO_LARGURA_CAIXA = 170
         const val REDUCAO_LARGURA_CAMPO = 30
+        const val LIMITE_POTENCIA_LINEAR = 15
+        const val LIMITE_POTENCIA_LOGARITMICA = 9
     }
 
     private val caixaUnidadePotenciaLinear = JComboBox(
         UnidadePotenciaLinear.entries.toTypedArray()
     )
-    private val campoPotenciaLinear = JTextField(15)
+    private val campoPotenciaLinear = JTextField(15).apply {
+        (document as AbstractDocument).documentFilter =
+            FiltroLimiteCaracteres(LIMITE_POTENCIA_LINEAR)
+    }
 
     private val caixaUnidadePotenciaLogaritmica = JComboBox(
         UnidadePotenciaLogaritmica.entries.toTypedArray()
     )
-    private val campoPotenciaLogaritmica = JTextField(15)
+    private val campoPotenciaLogaritmica = JTextField(15).apply {
+        (document as AbstractDocument).documentFilter =
+            FiltroLimiteCaracteres(LIMITE_POTENCIA_LOGARITMICA)
+    }
 
     private val rotuloUnidadeLinear = JLabel(
         UnidadePotenciaLinear.MILLIWATT.simbolo
@@ -31,10 +44,10 @@ class ConversorPotenciaGUI : JFrame() {
         UnidadePotenciaLogaritmica.DBM.simbolo
     )
 
-    private val botaoConverter = JButton("Converter")
     private val botaoLimpar = JButton("Limpar")
 
     private var campoDeOrigem = CampoDeOrigem.LINEAR
+    private var ultimoCampoFocado = campoPotenciaLinear
     private var atualizandoCampos = false
 
     private enum class CampoDeOrigem {
@@ -153,8 +166,6 @@ class ConversorPotenciaGUI : JFrame() {
         val painelBotoes = JPanel(
             FlowLayout(FlowLayout.CENTER, 10, 15)
         ).apply {
-            botaoConverter.isFocusable = false
-            add(botaoConverter)
             add(botaoLimpar)
         }
 
@@ -165,7 +176,7 @@ class ConversorPotenciaGUI : JFrame() {
         }
 
         add(painelCentral, BorderLayout.CENTER)
-    }
+    } // fim de fun criarInterface()
 
     private fun adicionarCaixa(
         painel: JPanel,
@@ -224,24 +235,29 @@ class ConversorPotenciaGUI : JFrame() {
     }
 
     private fun configurarEventos() {
-        botaoConverter.addActionListener { realizarConversao() }
         botaoLimpar.addActionListener { limparCampos() }
+
+        val ouvinteDeFoco = object : FocusAdapter() {
+            override fun focusGained(evento: FocusEvent) {
+                ultimoCampoFocado = evento.component as JTextField
+            }
+        }
+        campoPotenciaLinear.addFocusListener(ouvinteDeFoco)
+        campoPotenciaLogaritmica.addFocusListener(ouvinteDeFoco)
 
         caixaUnidadePotenciaLinear.addActionListener {
             val unidade = caixaUnidadePotenciaLinear.selectedItem
                     as? UnidadePotenciaLinear
             rotuloUnidadeLinear.text = unidade?.simbolo.orEmpty()
+            atualizarConversaoAutomatica()
         }
         caixaUnidadePotenciaLogaritmica.addActionListener {
             val unidade = caixaUnidadePotenciaLogaritmica.selectedItem
                     as? UnidadePotenciaLogaritmica
             rotuloUnidadeLogaritmica.text = unidade?.simbolo.orEmpty()
+            atualizarConversaoAutomatica()
         }
 
-        campoPotenciaLinear.addActionListener { realizarConversao() }
-        campoPotenciaLogaritmica.addActionListener {
-            realizarConversao()
-        }
         campoPotenciaLinear.document.addDocumentListener(
             criarOuvinteDeEdicao(CampoDeOrigem.LINEAR)
         )
@@ -249,22 +265,42 @@ class ConversorPotenciaGUI : JFrame() {
             criarOuvinteDeEdicao(CampoDeOrigem.LOGARITMICO)
         )
 
-        rootPane.defaultButton = botaoConverter
-        botaoConverter.mnemonic = KeyEvent.VK_C
-        botaoLimpar.mnemonic = KeyEvent.VK_L
+        botaoLimpar.mnemonic = 'L'.code
     }
 
-    private fun realizarConversao() {
+    private fun atualizarConversaoAutomatica() {
+        if (atualizandoCampos) return
+
+        campoDeOrigem = when {
+            campoPotenciaLinear.hasFocus() -> CampoDeOrigem.LINEAR
+            campoPotenciaLogaritmica.hasFocus() -> CampoDeOrigem.LOGARITMICO
+            else -> campoDeOrigem
+        }
+
+        val campoOrigem = if (campoDeOrigem == CampoDeOrigem.LINEAR) {
+            campoPotenciaLinear
+        } else {
+            campoPotenciaLogaritmica
+        }
+        val campoDestino = if (campoDeOrigem == CampoDeOrigem.LINEAR) {
+            campoPotenciaLogaritmica
+        } else {
+            campoPotenciaLinear
+        }
+
+        if (campoOrigem.text.isBlank()) {
+            definirTextoSemAlterarOrigem(campoDestino, "")
+            return
+        }
+
         try {
             if (campoDeOrigem == CampoDeOrigem.LINEAR) {
                 converterDePotenciaLinearParaPotenciaLogaritmica()
             } else {
                 converterDePotenciaLogaritmicaParaPotenciaLinear()
             }
-        } catch (erro: IllegalArgumentException) {
-            mostrarMensagemDeErro(
-                erro.message ?: "Não foi possível realizar a conversão."
-            )
+        } catch (_: IllegalArgumentException) {
+            definirTextoSemAlterarOrigem(campoDestino, "")
         }
     }
 
@@ -283,9 +319,8 @@ class ConversorPotenciaGUI : JFrame() {
 
         definirTextoSemAlterarOrigem(
             campoPotenciaLogaritmica,
-            formatarResultado(resultado)
+            formatarResultado(resultado, 2)
         )
-        posicionarCursorNoFim(campoPotenciaLinear)
     }
 
     private fun converterDePotenciaLogaritmicaParaPotenciaLinear() {
@@ -303,9 +338,8 @@ class ConversorPotenciaGUI : JFrame() {
 
         definirTextoSemAlterarOrigem(
             campoPotenciaLinear,
-            formatarResultado(resultado)
+            formatarResultado(resultado, 3)
         )
-        posicionarCursorNoFim(campoPotenciaLogaritmica)
     }
 
     private fun lerPotencia(campo: JTextField): Double {
@@ -320,34 +354,24 @@ class ConversorPotenciaGUI : JFrame() {
             )
     }
 
-    private fun formatarResultado(resultado: Double): String {
+    private fun formatarResultado(
+        resultado: Double,
+        casasDecimais: Int
+    ): String {
         return BigDecimal.valueOf(resultado)
-            .stripTrailingZeros()
+            .setScale(casasDecimais, RoundingMode.HALF_UP)
             .toPlainString()
     }
 
     private fun limparCampos() {
         definirTextoSemAlterarOrigem(campoPotenciaLinear, "")
         definirTextoSemAlterarOrigem(campoPotenciaLogaritmica, "")
-        campoDeOrigem = CampoDeOrigem.LINEAR
-        campoPotenciaLinear.requestFocusInWindow()
-    }
-
-    private fun mostrarMensagemDeErro(mensagem: String) {
-        JOptionPane.showMessageDialog(
-            this,
-            mensagem,
-            "Dados inválidos",
-            JOptionPane.WARNING_MESSAGE
-        )
-
-        val campo = if (campoDeOrigem == CampoDeOrigem.LINEAR) {
-            campoPotenciaLinear
+        campoDeOrigem = if (ultimoCampoFocado === campoPotenciaLinear) {
+            CampoDeOrigem.LINEAR
         } else {
-            campoPotenciaLogaritmica
+            CampoDeOrigem.LOGARITMICO
         }
-        campo.requestFocusInWindow()
-        campo.selectAll()
+        ultimoCampoFocado.requestFocusInWindow()
     }
 
     private fun configurarCaixa(caixa: JComboBox<*>, fonte: Font) {
@@ -390,11 +414,6 @@ class ConversorPotenciaGUI : JFrame() {
         )
     }
 
-    private fun posicionarCursorNoFim(campo: JTextField) {
-        campo.requestFocusInWindow()
-        campo.caretPosition = campo.document.length
-    }
-
     private fun criarOuvinteDeEdicao(
         origem: CampoDeOrigem
     ): DocumentListener {
@@ -402,6 +421,7 @@ class ConversorPotenciaGUI : JFrame() {
             private fun registrarOrigem() {
                 if (!atualizandoCampos) {
                     campoDeOrigem = origem
+                    atualizarConversaoAutomatica()
                 }
             }
 
@@ -429,6 +449,31 @@ class ConversorPotenciaGUI : JFrame() {
         } finally {
             atualizandoCampos = false
         }
+    }
+}
+
+private class FiltroLimiteCaracteres(
+    private val limite: Int
+) : DocumentFilter() {
+    override fun replace(
+        filtro: FilterBypass,
+        offset: Int,
+        length: Int,
+        texto: String?,
+        atributos: AttributeSet?
+    ) {
+        val espacoDisponivel = limite - (filtro.document.length - length)
+        val textoLimitado = texto.orEmpty().take(espacoDisponivel.coerceAtLeast(0))
+        filtro.replace(offset, length, textoLimitado, atributos)
+    }
+
+    override fun insertString(
+        filtro: FilterBypass,
+        offset: Int,
+        texto: String?,
+        atributos: AttributeSet?
+    ) {
+        replace(filtro, offset, 0, texto, atributos)
     }
 }
 
