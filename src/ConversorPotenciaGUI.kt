@@ -16,7 +16,8 @@ class ConversorPotenciaGUI : JFrame() {
 
     private companion object {
         const val REDUCAO_LARGURA_CAIXA = 170
-        const val REDUCAO_LARGURA_CAMPO = 30
+        const val REDUCAO_LARGURA_CAMPO_LINEAR = 120
+        const val REDUCAO_LARGURA_CAMPO_LOGARITMICO = 120
         const val LIMITE_POTENCIA_LINEAR = 15
         const val LIMITE_POTENCIA_LOGARITMICA = 9
     }
@@ -112,11 +113,11 @@ class ConversorPotenciaGUI : JFrame() {
             rotuloUnidadeLogaritmica.preferredSize.width
         )
         rotuloUnidadeLinear.preferredSize = Dimension(
-            larguraUnidade + REDUCAO_LARGURA_CAMPO,
+            larguraUnidade + REDUCAO_LARGURA_CAMPO_LINEAR,
             rotuloUnidadeLinear.preferredSize.height
         )
         rotuloUnidadeLogaritmica.preferredSize = Dimension(
-            larguraUnidade + REDUCAO_LARGURA_CAMPO,
+            larguraUnidade + REDUCAO_LARGURA_CAMPO_LOGARITMICO,
             rotuloUnidadeLogaritmica.preferredSize.height
         )
 
@@ -163,9 +164,13 @@ class ConversorPotenciaGUI : JFrame() {
             3
         )
 
+        botaoLimpar.font = Font("SansSerif", Font.PLAIN, 13)
+        botaoLimpar.preferredSize = Dimension(96, 34)
+
         val painelBotoes = JPanel(
-            FlowLayout(FlowLayout.CENTER, 10, 15)
+            FlowLayout(FlowLayout.RIGHT, 10, 15)
         ).apply {
+            border = BorderFactory.createEmptyBorder(25, 0, 0, 25)
             add(botaoLimpar)
         }
 
